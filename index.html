@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIP-353 Support Tracker</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .status-supported { background-color: #d4edda; }
+        .status-in-progress { background-color: #fff3cd; }
+        .status-not-supported { background-color: #f8f9fa; }
+        .status-error { background-color: #f8d7da; }
+        .last-updated { font-style: italic; margin-bottom: 20px; }
+        .summary-box { 
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container my-5">
+        <h1>BIP-353 Support in Bitcoin/Lightning Projects</h1>
+        <p class="lead">Track which Bitcoin and Lightning Network projects support BIP-353 Silent Payments</p>
+        
+        <div class="last-updated" id="lastUpdated">Last updated: Loading...</div>
+        
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="summary-box status-supported">
+                    <h4>Supported</h4>
+                    <h2 id="supportedCount">-</h2>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="summary-box status-in-progress">
+                    <h4>In Progress</h4>
+                    <h2 id="inProgressCount">-</h2>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="summary-box status-not-supported">
+                    <h4>Not Supported</h4>
+                    <h2 id="notSupportedCount">-</h2>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="summary-box">
+                    <h4>Total Projects</h4>
+                    <h2 id="totalCount">-</h2>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mb-3">
+            <input type="text" id="searchInput" class="form-control" placeholder="Search projects...">
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-striped table-hover" id="projectsTable">
+                <thead>
+                    <tr>
+                        <th>Project</th>
+                        <th>BIP-353 Status</th>
+                        <th>Stars</th>
+                        <th>Evidence</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr>
+                        <td colspan="4" class="text-center">Loading data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Fetch the JSON data
+        async function fetchData() {
+            try {
+                const response = await fetch('bip353_results.json');
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('tableBody').innerHTML = 
+                    `<tr><td colspan="4" class="text-center">Error loading data: ${error.message}</td></tr>`;
+                return [];
+            }
+        }
+
+        // Render the table with the data
+        function renderTable(data, searchTerm = '') {
+            const tableBody = document.getElementById('tableBody');
+            
+            // Filter data based on search term
+            const filteredData = data.filter(repo => 
+                repo.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                repo.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+            
+            // Sort data by status (Supported, In Progress, Not Supported)
+            const statusOrder = {"Supported": 0, "In Progress": 1, "Not Supported": 2, "Error": 3};
+            const sortedData = filteredData.sort((a, b) => 
+                (statusOrder[a.bip353_status] - statusOrder[b.bip353_status]) || 
+                a.name.localeCompare(b.name)
+            );
+            
+            // Clear table
+            tableBody.innerHTML = '';
+            
+            // Add rows
+            if (sortedData.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="4" class="text-center">No matching projects found</td></tr>`;
+                return;
+            }
+            
+            sortedData.forEach(repo => {
+                const row = document.createElement('tr');
+                
+                // Apply class based on status
+                row.className = `status-${repo.bip353_status.toLowerCase().replace(' ', '-')}`;
+                
+                row.innerHTML = `
+                    <td><a href="${repo.url}" target="_blank">${repo.name}</a></td>
+                    <td>${repo.bip353_status}</td>
+                    <td>${repo.stars}</td>
+                    <td>${repo.evidence && repo.evidence.length ? 
+                        repo.evidence.map(e => `<div>${e}</div>`).join('') : 'None found'}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+            
+            // Update summary counts
+            updateSummary(data);
+        }
+
+        // Update the summary boxes
+        function updateSummary(data) {
+            const supported = data.filter(repo => repo.bip353_status === "Supported").length;
+            const inProgress = data.filter(repo => repo.bip353_status === "In Progress").length;
+            const notSupported = data.filter(repo => repo.bip353_status === "Not Supported").length;
+            const total = data.length;
+            
+            document.getElementById('supportedCount').textContent = supported;
+            document.getElementById('inProgressCount').textContent = inProgress;
+            document.getElementById('notSupportedCount').textContent = notSupported;
+            document.getElementById('totalCount').textContent = total;
+            
+            // Update last updated date
+            const currentDate = new Date().toLocaleString();
+            document.getElementById('lastUpdated').textContent = `Last updated: ${currentDate}`;
+        }
+
+        // Initialize the page
+        async function initialize() {
+            const data = await fetchData();
+            renderTable(data);
+            
+            // Set up search functionality
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('input', (e) => {
+                renderTable(data, e.target.value);
+            });
+        }
+
+        // Load everything when the page loads
+        document.addEventListener('DOMContentLoaded', initialize);
+    </script>
+</body>
+</html>
